@@ -1,7 +1,5 @@
 # mcp-trmm
-This project is designed to interact with the **Tactical Remote Monitoring and Management (TRMM) API**, create an **SQLite3 database** from the API schema, and enable **Retrieval-Augmented Generation (RAG)** to enhance interaction with the API. It includes a set of tools to query the RMM API schema, forward requests to the live production RMM API server, and provide an LLM-powered CLI interface for exploring available paths.
-
-https://docs.tacticalrmm.com/functions/api/
+This project is designed to interact with the **Tactical Remote Monitoring and Management (RMM) API**, create an **SQLite3 database** from the API schema, and enable **Retrieval-Augmented Generation (RAG)** to enhance interaction with the API. It includes a set of tools to query the RMM API schema, forward requests to the live production RMM API server, and provide an LLM-powered CLI interface for exploring available paths.
 
 ## Project Overview
 
@@ -103,7 +101,22 @@ This script provides a CLI interface where you can query the API paths available
 ```bash
 source venv/bin/activate
 python 03_llm_cli__rag.py
+...
+💡 Ask a question about the API: /users
+
+hf.co/ibm-research/granite-3.2-8b-instruct-GGUF:latest's Response:
+ Question: What actions can be performed on a user's sessions?
+
+From the provided API schema, there are two endpoints related to managing a user's sessions:
+
+1. DELETE /accounts/{id}/users/{session_id} - This likely allows you to delete (remove) a specific session associated with a particular user.
+2. POST /accounts/users/{id}/sessions - This might be used to create or manage sessions for a specific user, though the endpoint description is not available.
+
+Unfortunately, without more detailed descriptions, I can't provide exact actions or additional details about these endpoints. Please refer to the API documentation for precise information.
+
 ```
+
+what happened on the backend? (03_flaskapy.py): `"GET /query?query=/users HTTP/1.1" 200 - `
 
 Run the MCP Proxy Server (03_mcpserver.py), for Open-WebUI or Claude Desktop:
 This server forwards requests from the Flask API to the live production RMM API.
