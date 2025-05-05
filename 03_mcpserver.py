@@ -45,11 +45,10 @@ def search_endpoint(query: str):
              "responses": json.loads(responses)} for path, method, description, request_body, responses in results]
 
 @mcp.tool()
-async def query_api(query: str, api_key: str) -> str:
-    """Search the API schema for an endpoint and forward the request to the external API.
+async def query_api(query: str) -> str:
+    """Search the API schema for an endpoint.
     Args:
         query: The path or query to search for in the API schema.
-        api_key: The API key for external API authorization.
     """
     # Search for the endpoint in the local schema database
     results = search_endpoint(query)
@@ -57,21 +56,29 @@ async def query_api(query: str, api_key: str) -> str:
     if not results:
         return json.dumps({"error": "No matching endpoints found"})
 
-    # Extract endpoint and method from the results
-    endpoint_info = results[0]
-    endpoint = endpoint_info['path']
-    method = endpoint_info['method'].lower()
+    # Return all paths as available options
+    available_paths = [{"path": endpoint_info["path"], "description": endpoint_info["description"], "method": endpoint_info["method"]} for endpoint_info in results]
+    return json.dumps({"available_paths": available_paths})
 
+@mcp.tool()
+async def run_api(query: str, method: str,api_key: str) -> str:
+    """Run API Query by forwarding the request to the external API with the query, method, and api_key.
+    Args:
+        query: The path or query to search for in the API schema.
+        method: The method to use: GET, POST, PUT, DELETE.
+        api_key: The API key for external API authorization.
+    """
     # Prepare headers and data for the request
     headers = {"X-API-KEY": api_key}
     data = None  # This would depend on your API's request body
     params = None  # Query parameters, if any
 
-    # Forward the request to the external API
-    response = await make_request(f"{EXTERNAL_API_BASE}{endpoint}", method, headers=headers, data=data, params=params)
-    return json.dumps(response)
+    # Forward the request to the external API and return the response
+    response = await make_request(f"{EXTERNAL_API_BASE}{query}", method, headers=headers, data=data, params=params)
+
+    return response
 
 if __name__ == "__main__":
     # Run the MCP server on stdio transport
     mcp.run(transport='stdio')
-    # command to run this mcp-server from terminal for use with open-webui: ` uvx mcpo --port 5086 -- uv run 03_mcpserver.py `
+    # command to run this mcp-server from terminal for use with open-webui: ` uvx mcpo --port 5087 -- uv run 03_mcpserver.py `
