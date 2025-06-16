@@ -1,5 +1,5 @@
 #  TRMM API Agent (mcp-trmm)
-This project is a secure, bearer-authenticated FastAPI wrapper for the Tactical RMM API using the [MCP](https://github.com/jmorganca/mcpo) server and SQLite-backed schema search. It allows querying documented endpoints locally and forwarding live requests securely to the RMM production API. TRMM [https://docs.tacticalrmm.com/functions/api/]
+This project is a secure, bearer-authenticated FastAPI wrapper for the Tactical RMM API using the [MCP](https://github.com/jmorganca/mcpo) server and SQLite-backed schema search. It allows querying documented endpoints locally and forwarding live requests securely to the RMM production API. TRMM[https://docs.tacticalrmm.com/functions/api/]
 
 
 ## Features
