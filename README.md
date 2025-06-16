@@ -17,7 +17,6 @@ This project is a secure, bearer-authenticated FastAPI wrapper for the Tactical 
 | File                      | Purpose                                                          |
 | ------------------------- | ---------------------------------------------------------------- |
 | `rmm_tools.py`            | Registers `@mcp.tool()` functions (`query_api`, `run_api`)       |
-| `flaskapi_server.py`      | FastAPI app, bearer auth, routes, and Swagger customization      |
 | `config.py`               | Contains your `MCP_BEARER_TOKEN` and RMM `xcred` API key         |
 | `api_schema4_rmm.db`      | SQLite3 database holding indexed RMM API schema                  |
 | `00_convert_yaml_json.py` | Converts RMM `rmm.yaml` spec to JSON format                      |
@@ -25,6 +24,8 @@ This project is a secure, bearer-authenticated FastAPI wrapper for the Tactical 
 | `02_query_database.py`    | CLI tool to search API schema locally using keywords             |
 | `02_debug_relay2RMM.py`   | Flask server that proxies local schema + forwards live requests  |
 | `03_llm_cli_rag.py`       | CLI assistant for interacting with schema using local LLM + RAG  |
+| `03_mcpserver_agent+auth.py`      | FastAPI app, bearer auth, routes, and Swagger customization      |
+| `03_mcpserver_agent_noauth.py`       | Combines `rmm_tools.py` & `03_mcpserver_agent+auth.py` into one file where no authentication is required.  |
 
 ---
 
@@ -62,7 +63,7 @@ The primary goal of this project is to parse the **RMM API schema**, store it in
 
 
 ### 3. `03_mcpserver_agent*.py`
-`03_mcpserver_agent+auth.py` & `03_mcpserver_agent_noauth.py` act as an **MCP proxy server**, forwarding queries to the live production **RMM API server** (a REST API). It works as a mediator between the local system (where the database is stored) and the live RMM API. The only difference is one uses Bearer Auth, and the other uses no auth.
+`03_mcpserver_agent+auth.py` & `03_mcpserver_agent_noauth.py` act as an **MCP proxy server**, forwarding queries to the live production **RMM API server** (a REST API). It works as a mediator between the local system (where the database is stored) and the live RMM API. The only difference between the two *agent*.py scripts is that one uses Bearer Auth, and the other uses no auth.
 
 - **MCP Proxy Server**: Handles requests by querying the local SQLite3 database, fetching matching endpoints, and forwarding the requests to the live RMM API server.
 - **Retrieval-Augmented Generation (RAG)**: Retrieves relevant API endpoints from the SQLite3 database and dynamically forwards requests to the live RMM API.
@@ -119,17 +120,17 @@ python 03_llm_cli__rag.py
 
 
 
-Run the MCP Proxy Server (03_mcpserver.py), for Open-WebUI or Claude Desktop **with no security.*:
+Run the MCP Proxy Server (03_mcpserver_agent_noauth.py), for Open-WebUI or Claude Desktop **with no security.*:
 This server forwards requests from the Flask API to the live production RMM API, without using Bearer Authentication.
 ```bash
 source .venv/bin/activate
-uvx mcpo --port 5086 -- uv run 03_mcpserver.py
+uvx mcpo --port 5086 -- uv run 03_mcpserver_agent_noauth.py
 ```
 
 
 Run the FastAPI Server (secured with Bearer Token)
 ```bash
-uvicorn flaskapi_server:app --host 0.0.0.0 --port 5074
+uvicorn 03_mcpserver_agent+auth:app --host 0.0.0.0 --port 5074
 ```
 
 Then visit: [http://localhost:5074/docs](http://localhost:5074/docs)
