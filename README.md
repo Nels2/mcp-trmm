@@ -119,15 +119,15 @@ python 03_llm_cli__rag.py
 
 
 
-Run the MCP Proxy Server (03_mcpserver.py), for Open-WebUI or Claude Desktop:
-This server forwards requests from the Flask API to the live production RMM API.
+Run the MCP Proxy Server (03_mcpserver.py), for Open-WebUI or Claude Desktop **with no security.*:
+This server forwards requests from the Flask API to the live production RMM API, without using Bearer Authentication.
 ```bash
 source .venv/bin/activate
 uvx mcpo --port 5086 -- uv run 03_mcpserver.py
 ```
 
 
-Run the FastAPI Server (secured)
+Run the FastAPI Server (secured with Bearer Token)
 ```bash
 uvicorn flaskapi_server:app --host 0.0.0.0 --port 5074
 ```
@@ -135,7 +135,14 @@ uvicorn flaskapi_server:app --host 0.0.0.0 --port 5074
 Then visit: [http://localhost:5074/docs](http://localhost:5074/docs)
 
 ### 4. Test with curl
+for non-secured:
+```bash
+curl -X POST http://localhost:5074/query_api \
+  -H "Content-Type: application/json" \
+  -d '{"query": "/User"}'
+```
 
+for secured:
 ```bash
 curl -X POST http://localhost:5074/query_api \
   -H "Authorization: Bearer <YOUR_TOKEN>" \
