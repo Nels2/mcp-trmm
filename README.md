@@ -1,5 +1,32 @@
-# mcp-trmm
-This project is designed to interact with the **Tactical Remote Monitoring and Management (RMM) API**, create an **SQLite3 database** from the API schema, and enable **Retrieval-Augmented Generation (RAG)** to enhance interaction with the API. It includes a set of tools to query the RMM API schema, forward requests to the live production RMM API server, and provide an LLM-powered CLI interface for exploring available paths.
+#  TRMM API Agent (mcp-trmm)
+This project is a secure, bearer-authenticated FastAPI wrapper for the Tactical RMM API using the [MCP](https://github.com/jmorganca/mcpo) server and SQLite-backed schema search. It allows querying documented endpoints locally and forwarding live requests securely to the RMM production API. TRMM [https://docs.tacticalrmm.com/functions/api/]
+
+
+## Features
+
+- Bearer token authentication (works with Swagger UI `/docs`)
+- LLM tool integration via MCP (@mcp.tool)
+- RAG-like path discovery via SQLite (`api_schema4_rmm.db`)
+- OpenWebUI-compatible Swagger generation
+- Full local + live production API querying
+- SQLite schema builder, YAML to JSON converter, and CLI assistant tools included
+
+
+## Project Structure
+
+| File                      | Purpose                                                          |
+| ------------------------- | ---------------------------------------------------------------- |
+| `rmm_tools.py`            | Registers `@mcp.tool()` functions (`query_api`, `run_api`)       |
+| `flaskapi_server.py`      | FastAPI app, bearer auth, routes, and Swagger customization      |
+| `config.py`               | Contains your `MCP_BEARER_TOKEN` and RMM `xcred` API key         |
+| `api_schema4_rmm.db`      | SQLite3 database holding indexed RMM API schema                  |
+| `00_convert_yaml_json.py` | Converts RMM `rmm.yaml` spec to JSON format                      |
+| `01_create_database.py`   | Loads JSON schema into `api_schema4_rmm.db` for fast path search |
+| `02_query_database.py`    | CLI tool to search API schema locally using keywords             |
+| `02_debug_relay2RMM.py`   | Flask server that proxies local schema + forwards live requests  |
+| `03_llm_cli_rag.py`       | CLI assistant for interacting with schema using local LLM + RAG  |
+
+---
 
 ## Project Overview
 
@@ -34,8 +61,8 @@ The primary goal of this project is to parse the **RMM API schema**, store it in
 
 
 
-### 3. `03_mcpserver.py`
-`03_mcpserver.py` acts as an **MCP proxy server**, forwarding queries to the live production **RMM API server** (a REST API). It works as a mediator between the local system (where the database is stored) and the live RMM API.
+### 3. `03_mcpserver_agent*.py`
+`03_mcpserver_agent+auth.py` & `03_mcpserver_agent_noauth.py` act as an **MCP proxy server**, forwarding queries to the live production **RMM API server** (a REST API). It works as a mediator between the local system (where the database is stored) and the live RMM API. The only difference is one uses Bearer Auth, and the other uses no auth.
 
 - **MCP Proxy Server**: Handles requests by querying the local SQLite3 database, fetching matching endpoints, and forwarding the requests to the live RMM API server.
 - **Retrieval-Augmented Generation (RAG)**: Retrieves relevant API endpoints from the SQLite3 database and dynamically forwards requests to the live RMM API.
@@ -53,56 +80,31 @@ The primary goal of this project is to parse the **RMM API schema**, store it in
     - **LLM Querying**: This script allows users to ask questions related to the RMM API paths available in the schema, which is stored in the SQLite3 database.
     - **Simultaneous Execution**: It’s meant to run alongside `03_flaskapi.py`, allowing real-time interaction between the user and the LLM, enabling intelligent querying of the RMM API paths.
 
-### Workflow
+## Setup & Installation
 
-1. **Run `03_flaskapi.py`**: This script exposes an API that allows you to query the local SQLite3 database for API paths, methods, and descriptions.
-
-   - Use the `POST /query` endpoint to search for API endpoints in the local schema.
-   - Example request:
-     ```bash
-     curl -X 'POST' \
-       'http://127.0.0.1:5086/query' \
-       -H 'Content-Type: application/json' \
-       -d '{"query": "/agents", "api_key": "your_api_key"}'
-     ```
-
-2. **Run `03_llm_cli__rag.py`**: This script allows you to query the available paths using the LLM, which leverages the SQLite3 database to find relevant API paths dynamically.
-
-   - It works by asking the LLM about the available API paths and their details.
-   - Example CLI usage:
-     ```bash
-     python 03_llm_cli__rag.py
-
-     💡 Ask a question about the API: /users
-
-      hf.co/ibm-research/granite-3.2-8b-instruct-GGUF:latest's Response:
-      Question: What actions can be performed on a user's sessions?
-
-      From the provided API schema, there are two endpoints related to managing a user's sessions:
-
-      1. DELETE /accounts/{id}/users/{session_id} - Allows you to delete (remove) a specific session associated with a particular user.
-      2. POST /accounts/users/{id}/sessions - Used to create or manage sessions for a specific user, though the endpoint description is not available.
-
-     ```
-
-3. **Query the Live API**: Once the path is retrieved, `03_mcpserver.py` forwards the request to the live production **RMM API** server. The response from the live API is then returned to the user.
-
----
-
-## Setup and Installation
-
-### 1. **Install Dependencies**
+### 1. Install dependencies
 You will need to install the required dependencies for the project:
 **uv / uvx installed from source[https://docs.astral.sh/uv/getting-started/installation/]**
 ```bash
-pip install fastapi uvicorn httpx mcpo sqlite3 pyyaml flask requests flasgger 
+uv pip install fastapi uvicorn httpx mcpo sqlite3 pyyaml flask requests flasgger 
 ```
-### 2. **Run the Servers**
+
+### 2. Build SQLite3 Schema DB (optional)
+
+```bash
+python 00_convert_yaml_json.py  # convert to JSON
+python 01_create_database.py    # build SQLite DB from schema
+```
+
+
+### 3. **Run the Servers**
+You have a few options for running this, read below!
+
 Start the **Local** Flask API Server (03_flaskapi.py):
 This server listens for queries about the RMM API schema and forwards requests to the live RMM API server.
 
 ```bash
-source venv/bin/activate
+source .venv/bin/activate
 python 03_flaskapi.py
 ```
 
@@ -110,7 +112,7 @@ Start the **Local** LLM CLI Session (03_llm_cli__rag.py):
 This script provides a CLI interface where you can query the API paths available in the schema.
 
 ```bash
-source venv/bin/activate
+source .venv/bin/activate
 python 03_llm_cli__rag.py
 
 ```
@@ -120,22 +122,86 @@ python 03_llm_cli__rag.py
 Run the MCP Proxy Server (03_mcpserver.py), for Open-WebUI or Claude Desktop:
 This server forwards requests from the Flask API to the live production RMM API.
 ```bash
-source venv/bin/activate
+source .venv/bin/activate
 uvx mcpo --port 5086 -- uv run 03_mcpserver.py
 ```
 
 
+Run the FastAPI Server (secured)
+```bash
+uvicorn flaskapi_server:app --host 0.0.0.0 --port 5074
+```
 
-### 3. **Interacting with the API:**
-You can now send queries using the CLI or directly interact with the Flask API to search for endpoints and forward requests to the live RMM API.
+Then visit: [http://localhost:5074/docs](http://localhost:5074/docs)
+
+### 4. Test with curl
+
+```bash
+curl -X POST http://localhost:5074/query_api \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "/User"}'
+```
+
+---
+
+## Endpoints
+
+### `POST /query_api`
+
+- Search `api_schema4_rmm.db` for matching paths/methods/descriptions.
+- Returns matching endpoints based on partial path or keyword.
+
+### `POST /run_api`
+
+- Forwards request to production RMM API at `https://api.remotelyfx.spaceagefcu.org`.
+- Adds `X-API-KEY` header from config.
+- Currently supports: GET, POST, PUT, DELETE.
+
+---
+
+## Swagger Auth Setup
+
+- Uses **HTTPBearer** security scheme
+- All endpoints are secured with a `Bearer` token
+- Click **Authorize** on `/docs` page and paste your token once
+
+---
+
+## Dev Notes
+
+- Based on previous MCP projects like `scale-api-agent` and `365-sacu-email-server`
+- SQLite3 path database created via earlier `01_create_database.py` tooling
+- LLM tooling (RAG + CLI) lives in separate modules (`03_llm_cli_rag.py` etc.)
+
+## Optional Tooling for Dev/Debug
+
+### 02\_debug\_relay2RMM.py
+
+A Swagger-enabled relay that lets you test requests from the local SQLite schema DB and forward them to the live RMM API for live previewing and prototyping.
+
+### 03\_llm\_cli\_rag.py
+
+LLM-powered CLI agent for asking natural language questions about the schema.
+
+```bash
+python 03_llm_cli_rag.py
+💡 Ask a question about the API: /users
+```
 
 
 ## Use Cases
-### 1. Schema Exploration:
-You can dynamically query the API schema stored in the SQLite3 database and explore the available paths, methods, and descriptions.
 
-### 2. Forward Requests to Live API:
-Once the relevant endpoints are retrieved from the local database, the server forwards the requests to the live RMM API, allowing you to interact with the live production system.
+- Secure programmatic access to RMM endpoints from LLM tools
+- Offline schema exploration using SQLite and local tools
+- Developer-friendly curl/CLI testing via `run_api`
+- OpenWebUI integration for autonomous agents
 
-### 3. RAG (Retrieval-Augmented Generation):
-The integration of RAG allows for more intelligent and context-aware queries of the RMM API, making it easier to interact with the API based on real-time context and query responses.
+
+---
+
+## License
+
+MIT — use this with your RMM infrastructure or automate your own endpoints.
+
+
