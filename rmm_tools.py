@@ -6,7 +6,7 @@ from config import *
 # Initialize MCP
 mcp = FastMCP("trmm-api-agent")
 
-EXTERNAL_API_BASE = "https://api.trmm.org"
+EXTERNAL_API_BASE = "https://api.remotelyfx.spaceagefcu.org"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 
 async def make_request(url: str, method: str, headers: dict = None, data: dict = None, params: dict = None) -> dict[str, Any] | None:
@@ -41,9 +41,9 @@ async def query_api(query: str) -> str:
     ]})
 
 @mcp.tool()
-async def run_api(query: str, method: str) -> str:
+async def run_api(query: str, method: str, body: dict | None = None) -> str:
     headers = {"X-API-KEY": xcred}
-    response = await make_request(f"{EXTERNAL_API_BASE}{query}", method, headers=headers)
+    response = await make_request(f"{EXTERNAL_API_BASE}{query}", method, headers=headers, data=body)
     return response
 
 # Optional if running standalone
