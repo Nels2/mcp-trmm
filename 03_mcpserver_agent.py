@@ -2,6 +2,7 @@ from fastapi import FastAPI, Security, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
+from typing import Optional, Dict, Any
 from config import MCP_BEARER_TOKEN
 from rmm_tools import mcp, query_api, run_api
 
@@ -20,7 +21,7 @@ def verify_bearer_token(
 # === FastAPI App with Global Security Dependency
 app = FastAPI(
     title="TRMM API Agent",
-    version="1.0.0",
+    version="1.0.4",
     description="Secure MCP server for TRMM API usage",
     dependencies=[Depends(verify_bearer_token)]
 )
@@ -33,7 +34,8 @@ class QueryBody(BaseModel):
 class RunBody(BaseModel):
     query: str
     method: str
-    body: dict | None = None  # Optional full request body
+    payload: Optional[Dict[str, Any]] = None
+
 
 
 # === MCP Routes
@@ -43,7 +45,7 @@ async def query_api_route(body: QueryBody, token: str = Security(verify_bearer_t
 
 @app.post("/run_api", tags=["RMM Tools"])
 async def run_api_route(body: RunBody, token: str = Security(verify_bearer_token)):
-    return await run_api(query=body.query, method=body.method, body=body.body)
+    return await run_api(query=body.query, method=body.method, payload=body.payload)
 
 # === OpenAPI Swagger Auth Setup # not needed unless you do more than needed, if you get the drift!
 #def custom_openapi():
