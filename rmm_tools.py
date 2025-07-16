@@ -11,7 +11,7 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 
 async def make_request(url: str, method: str, headers: dict = None, data: dict = None, params: dict = None) -> dict[str, Any] | None:
     """
-    Makes an HTTP request to a specified Leostream API endpoint, handles errors, and returns the response.
+    Makes an HTTP request to a specified Tactical RMM API endpoint, handles errors, and returns the response.
     
     Args:
         url (str): The URL of the API endpoint.
