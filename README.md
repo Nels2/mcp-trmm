@@ -1,215 +1,243 @@
-#  TRMM API Agent (mcp-trmm)
-This project is a secure, bearer-authenticated FastAPI wrapper for the Tactical RMM API using the [MCP](https://github.com/jmorganca/mcpo) server and SQLite-backed schema search. It allows querying documented endpoints locally and forwarding live requests securely to the RMM production API. TRMM[https://docs.tacticalrmm.com/functions/api/]
+# TRMM MCP Server
 
+A focused MCP server for TRMM-style remote management operations.
 
-## Features
+This project exposes a curated set of MCP tools for common IT operations tasks such as:
 
-- Bearer token authentication (works with Swagger UI `/docs`)
-- LLM tool integration via MCP (@mcp.tool)
-- RAG-like path discovery via SQLite (`api_schema4_rmm.db`)
-- OpenWebUI-compatible Swagger generation
-- Full local + live production API querying
-- SQLite schema builder, YAML to JSON converter, and CLI assistant tools included
+- agent lookup and control
+- checks
+- scripts
+- services
+- software
+- Windows updates
+- reporting
+- alerts
+- automation
+- tasks
 
+The server is designed specifically for **local or smaller models** that are not reliable at constructing raw API paths, HTTP methods, or JSON payloads.
 
-## Project Structure
+Instead of exposing one generic “call any endpoint” tool, this server exposes **small, strongly-named tools** with only a few arguments. The backend then translates those arguments into valid API requests.
 
-| File                      | Purpose                                                          |
-| ------------------------- | ---------------------------------------------------------------- |
-| `rmm_tools.py`            | Registers `@mcp.tool()` functions (`query_api`, `run_api`)       |
-| `config.py`               | Contains your `MCP_BEARER_TOKEN` and RMM `xcred` API key         |
-| `api_schema4_rmm.db`      | SQLite3 database holding indexed RMM API schema                  |
-| `00_convert_yaml_json.py` | Converts RMM `rmm.yaml` spec to JSON format                      |
-| `01_create_database.py`   | Loads JSON schema into `api_schema4_rmm.db` for fast path search |
-| `02_query_database.py`    | CLI tool to search API schema locally using keywords             |
-| `02_debug_relay2RMM.py`   | Flask server that proxies local schema + forwards live requests  |
-| `03_llm_cli_rag.py`       | CLI assistant for interacting with schema using local LLM + RAG  |
-| `03_mcpserver_agent+auth.py`      | FastAPI app, bearer auth, routes, and Swagger customization      |
-| `03_mcpserver_agent_noauth.py`       | Combines `rmm_tools.py` & `03_mcpserver_agent+auth.py` into one file where no authentication is required.  |
+## Why this exists
 
----
+Smaller local models tend to struggle with:
 
-## Project Overview
+- choosing the correct endpoint
+- selecting the right HTTP method
+- building valid JSON payloads
+- keeping IDs and object types straight
+- avoiding destructive or overly broad actions
 
-The primary goal of this project is to parse the **RMM API schema**, store it in a **SQLite3 database**, and use it to augment queries made to the live RMM API. This is accomplished using several components, which work together to:
+This server solves that by giving the model:
 
-1. Parse the RMM API schema and store it in an SQLite3 database.
-2. Forward API queries to a live production RMM API server.
-3. Provide an LLM-powered CLI interface for querying and retrieving paths from the RMM API.
+- a small tool surface
+- explicit tool names
+- simple arguments
+- backend-side request translation
+- consistent result handling
 
-## Components
-
-### 0. `00_convert_yaml_json.py`
-`00_convert_yaml_json.py` is designed to convert a YAML file (`rmm.yaml`) into a JSON format and save it as a new file (`rmm_schema.json`).
-
-### 1. `01_create_database.py`
-`01_create_database.py` is designed to create a SQLite database (`api_schema4_rmm.db`) from a **JSON schema** (`rmm_schema.json`) containing the RMM API details. It stores API endpoint information, including path, method, description, request body, and responses, in a structured SQLite database. The script reads the **RMM API schema** from a **JSON file**, parses it, and stores relevant API details in a **SQLite database**. It creates a table for storing API endpoints and inserts the data into the table.
-
-### 2. `02_query_database.py`
-`02_query_database.py` allows you to **search for API endpoints** in an SQLite3 database (`api_schema4_rmm.db`) by querying a keyword. It retrieves matching paths, methods, descriptions, request body schemas, and response codes from the database and prints the results in a user-friendly format.
-  - The script searches the database for endpoints that contain the provided query keyword in the path. e.g; /login
-  - It prints the endpoint `path`, HTTP `method`, `description`, `request body schema`, and `response codes`.
-  - If the `request body` and `responses` exist, it pretty-prints them as formatted JSON.
-  - The data is stored in the `api_schema4_rmm.db` SQLite3 database, which contains the parsed RMM API schema.
-
-    #### 2a. `02_debug_relay2RMM.py`
-    This script acts as a **proxy server** for querying an **RMM API schema** stored in a SQLite3 database and forwarding API requests to the live production **RMM API server**. Do not confuse this with an MCP server because this is not it. The script allows you to query the API schema stored in the local SQLite3 database (`api_schema4_rmm.db`) and forward requests to the live **RMM API server**. It acts as a **debug relay**, providing a means to query the API schema and perform requests on the live API based on the schema.
-      - The script allows querying the local SQLite3 database for API endpoints based on a search keyword.
-      - Once an API endpoint is found, the script forwards the request (GET, POST, PUT, DELETE) to the live **RMM API** (`https://api.trmm.org`).
-      - **Swagger UI** is integrated for interactive documentation, allowing users to see available API endpoints and query them with ease.
-      - The script gracefully handles unsupported HTTP methods and responds with an error if no matching endpoints are found.
-
-
-
-
-### 3. `03_mcpserver_agent*.py`
-`03_mcpserver_agent+auth.py` & `03_mcpserver_agent_noauth.py` act as an **MCP proxy server**, forwarding queries to the live production **RMM API server** (a REST API). It works as a mediator between the local system (where the database is stored) and the live RMM API. The only difference between the two *agent*.py scripts is that one uses Bearer Auth, and the other uses no auth.
-
-- **MCP Proxy Server**: Handles requests by querying the local SQLite3 database, fetching matching endpoints, and forwarding the requests to the live RMM API server.
-- **Retrieval-Augmented Generation (RAG)**: Retrieves relevant API endpoints from the SQLite3 database and dynamically forwards requests to the live RMM API.
-- **Asynchronous Requests**: Uses `httpx` for asynchronous HTTP requests to forward queries to the production API.
-  
-    #### 3a. `03_flaskapi.py`
-    `03_flaskapi.py` serves as the **API endpoint** for querying the SQLite3 database and returning relevant API endpoint paths.
-
-    - **Search and Query**: This script allows you to query the SQLite3 database for specific API paths, methods, and descriptions.
-    - **Forward Requests**: After retrieving matching paths, the script forwards the requests to the live RMM API using the **MCP proxy server** (`03_mcpserver.py`).
-
-    #### 3b. `03_llm_cli__rag.py`
-    `03_llm_cli__rag.py` is the **command-line interface (CLI)** where users can interact with the **Retrieval-Augmented Generation (RAG)** system using a **Large Language Model (LLM)**.
-
-    - **LLM Querying**: This script allows users to ask questions related to the RMM API paths available in the schema, which is stored in the SQLite3 database.
-    - **Simultaneous Execution**: It’s meant to run alongside `03_flaskapi.py`, allowing real-time interaction between the user and the LLM, enabling intelligent querying of the RMM API paths.
-
-## Setup & Installation
-
-### 1. Install dependencies
-You will need to install the required dependencies for the project:
-**uv / uvx installed from source[https://docs.astral.sh/uv/getting-started/installation/]**
-```bash
-uv pip install fastapi uvicorn httpx mcpo sqlite3 pyyaml flask requests flasgger 
-```
-
-### 2. Build SQLite3 Schema DB (optional)
-
-```bash
-python 00_convert_yaml_json.py  # convert to JSON
-python 01_create_database.py    # build SQLite DB from schema
-```
-
-
-### 3. **Run the Servers**
-You have a few options for running this, read below!
-
-Start the **Local** Flask API Server (03_flaskapi.py):
-This server listens for queries about the RMM API schema and forwards requests to the live RMM API server.
-
-```bash
-source .venv/bin/activate
-python 03_flaskapi.py
-```
-
-Start the **Local** LLM CLI Session (03_llm_cli__rag.py):
-This script provides a CLI interface where you can query the API paths available in the schema.
-
-```bash
-source .venv/bin/activate
-python 03_llm_cli__rag.py
-
-```
-
-
-
-Run the MCP Proxy Server (03_mcpserver_agent_noauth.py), for Open-WebUI or Claude Desktop **with no security.*:
-This server forwards requests from the Flask API to the live production RMM API, without using Bearer Authentication.
-```bash
-source .venv/bin/activate
-uvx mcpo --port 5086 -- uv run 03_mcpserver_agent_noauth.py
-```
-
-
-Run the FastAPI Server (secured with Bearer Token)
-```bash
-uvicorn 03_mcpserver_agent+auth:app --host 0.0.0.0 --port 5074
-```
-
-Then visit: [http://localhost:5074/docs](http://localhost:5074/docs)
-
-### 4. Test with curl
-for non-secured:
-```bash
-curl -X POST http://localhost:5074/query_api \
-  -H "Content-Type: application/json" \
-  -d '{"query": "/User"}'
-```
-
-for secured:
-```bash
-curl -X POST http://localhost:5074/query_api \
-  -H "Authorization: Bearer <YOUR_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "/User"}'
-```
+In short, the model decides **what it wants to do**, and the backend decides **how to call the real API**.
 
 ---
 
-## Endpoints
+## Architecture
 
-### `POST /query_api`
+The project is split into four main layers:
 
-- Search `api_schema4_rmm.db` for matching paths/methods/descriptions.
-- Returns matching endpoints based on partial path or keyword.
+### `server.py`
+Hosts the FastAPI application and mounts the MCP ASGI app at `/mcp`.
 
-### `POST /run_api`
+Also includes:
 
-- Forwards request to production RMM API at `https://api.remotelyfx.spaceagefcu.org`.
-- Adds `X-API-KEY` header from config.
-- Currently supports: GET, POST, PUT, DELETE.
+- bearer token protection for the MCP route
+- a simple `/healthz` endpoint
+
+### `rmm_tools.py`
+Defines the MCP tools exposed to the model.
+
+These are the only functions the model should see.
+
+Examples:
+
+- `list_agents()`
+- `get_agent(agent_id)`
+- `reboot_agent(agent_id, mode="normal")`
+- `run_agent_command(agent_id, command, shell="cmd")`
+
+### `translator.py`
+Converts model-friendly arguments into actual API requests.
+
+This layer handles:
+
+- endpoint selection
+- method selection
+- JSON body construction
+- argument normalization
+- simple action mapping
+
+Example:
+
+- model calls `reboot_agent(agent_id="abc", mode="force")`
+- translator turns that into `PATCH /agents/{agent_id}/reboot/` with the correct request body
+
+### `api_client.py`
+Sends the final HTTP request to the upstream TRMM/PAI API and returns a normalized result object.
+
+This layer handles:
+
+- authentication headers
+- timeouts
+- JSON parsing
+- status handling
+- structured error reporting
 
 ---
 
-## Swagger Auth Setup
+## Design goals
 
-- Uses **HTTPBearer** security scheme
-- All endpoints are secured with a `Bearer` token
-- Click **Authorize** on `/docs` page and paste your token once
+This MCP server is intentionally opinionated.
+
+### 1. Small tool surface
+The server only includes **useful** tools, not every endpoint in the upstream schema.
+
+### 2. Model-friendly tools
+Each tool is designed to be easy for a smaller model to call correctly.
+
+### 3. Read-first behavior
+Where possible, the model should inspect first and act second.
+
+### 4. Backend-owned request formatting
+The model should never be responsible for building raw endpoint paths or request payloads.
+
+### 5. Safer operations
+Destructive or state-changing tools are kept limited and clearly named.
 
 ---
 
-## Dev Notes
+## Current tool coverage
 
-- Based on previous MCP projects like `scale-api-agent` and `365-sacu-email-server`
-- SQLite3 path database created via earlier `01_create_database.py` tooling
-- LLM tooling (RAG + CLI) lives in separate modules (`03_llm_cli_rag.py` etc.)
+## Agents
+- `list_agents`
+- `get_agent`
+- `get_agent_history`
+- `get_agent_notes`
+- `create_agent_note`
+- `get_agent_tasks`
+- `create_agent_task`
+- `reboot_agent`
+- `shutdown_agent`
+- `wake_agent`
+- `run_agent_command`
+- `run_agent_script`
+- `get_agent_eventlog`
+- `list_agent_processes`
+- `get_agent_process`
+- `kill_agent_process`
 
-## Optional Tooling for Dev/Debug
+## Checks
+- `list_checks`
+- `get_check`
+- `list_agent_checks`
+- `run_checks`
+- `run_checks_for_agent`
+- `reset_check`
+- `reset_all_checks_for_agent`
 
-### 02\_debug\_relay2RMM.py
+## Software
+- `get_agent_software`
+- `uninstall_agent_software`
+- `list_choco_packages`
 
-A Swagger-enabled relay that lets you test requests from the local SQLite schema DB and forward them to the live RMM API for live previewing and prototyping.
+## Windows Updates
+- `get_agent_winupdates`
+- `scan_agent_winupdates`
+- `install_agent_winupdates`
 
-### 03\_llm\_cli\_rag.py
+## Services
+- `list_agent_services`
+- `get_agent_service`
+- `control_agent_service`
 
-LLM-powered CLI agent for asking natural language questions about the schema.
+## Scripts
+- `list_scripts`
+- `get_script`
+- `download_script`
+- `test_script_on_agent`
+
+## Reporting
+- `list_report_history`
+- `run_report_history`
+- `list_report_schedules`
+- `get_report_schedule`
+- `run_report_schedule`
+
+## Alerts
+- `get_alert`
+- `update_alert_status`
+
+## Automation
+- `get_automation_policies_overview`
+- `get_automation_policy`
+- `list_automation_policy_checks`
+- `list_automation_policy_tasks`
+- `run_automation_task`
+- `get_automation_task_status`
+- `get_automation_check_status`
+
+## Tasks
+- `list_tasks`
+- `get_task`
+- `run_task`
+
+---
+
+## What is intentionally not included
+
+This server does **not** attempt to expose every endpoint from the upstream schema.
+
+The following kinds of endpoints are intentionally avoided unless they are truly needed:
+
+- generic CRUD for every object type
+- broad administrative mutation endpoints
+- highly ambiguous update endpoints
+- raw pass-through API tools
+- configuration-heavy endpoints that require large request bodies
+- tools that overlap too heavily with clearer existing tools
+
+This keeps the model from being overwhelmed and reduces incorrect tool selection.
+
+---
+
+## Example tool behavior
+
+### Example 1: Reboot an agent by name
+The model should:
+
+1. call `list_agents`
+2. identify the correct agent
+3. call `reboot_agent(agent_id, mode="normal")`
+
+### Example 2: Investigate a service issue
+The model should:
+
+1. find the agent
+2. call `get_agent_service(...)` or `list_agent_services(...)`
+3. inspect the result
+4. only then call `control_agent_service(...)` if requested or clearly appropriate
+
+### Example 3: Check Windows updates
+The model should:
+
+1. call `get_agent_winupdates(agent_id)`
+2. inspect the result
+3. only call `scan_agent_winupdates(...)` or `install_agent_winupdates(...)` when requested
+
+---
+
+## Running the server
+
+Start the FastAPI app with Uvicorn:
 
 ```bash
-python 03_llm_cli_rag.py
-💡 Ask a question about the API: /users
-```
-
-
-## Use Cases
-
-- Secure programmatic access to RMM endpoints from LLM tools
-- Offline schema exploration using SQLite and local tools
-- Developer-friendly curl/CLI testing via `run_api`
-- OpenWebUI integration for autonomous agents
-
-
----
-
-## License
-
-MIT — use this with your RMM infrastructure or automate your own endpoints.
-
-
+uvicorn server:app --host 0.0.0.0 --port 8000
