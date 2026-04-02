@@ -17,11 +17,10 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS api_endpoints (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     path TEXT,
-    method TEXT,
+    methods TEXT,
     description TEXT,
     request_body TEXT,
-    responses TEXT,
-    UNIQUE(path, method)  -- Ensure each path-method combination is unique
+    responses TEXT
 )
 """)
 
@@ -40,7 +39,7 @@ for path, details in schema.get("paths", {}).items():
         responses_str = json.dumps(response_summary)
 
         # Store in database
-        cursor.execute("INSERT OR IGNORE INTO api_endpoints (path, method, description, request_body, responses) VALUES (?, ?, ?, ?, ?)",
+        cursor.execute("INSERT OR IGNORE INTO api_endpoints (path, methods, description, request_body, responses) VALUES (?, ?, ?, ?, ?)",
                        (path, method.upper(), description, request_body_str, responses_str))
 
 # Commit changes and close connection
