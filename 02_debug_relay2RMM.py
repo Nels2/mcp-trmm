@@ -13,24 +13,24 @@ swagger = Swagger(app)
 def search_endpoint(query):
     conn = sqlite3.connect("api_schema4_rmm.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT path, method, description, request_body, responses FROM api_endpoints WHERE path LIKE ?", (f"%{query}%",))
+    cursor.execute("SELECT path, methods, description, request_body, responses FROM api_endpoints WHERE path LIKE ?", (f"%{query}%",))
     results = cursor.fetchall()
     conn.close()
 
-    return [{"path": path, "method": method, "description": description,
+    return [{"path": path, "methods": methods, "description": description,
              "request_body": json.loads(request_body) if request_body != "None" else None,
-             "responses": json.loads(responses)} for path, method, description, request_body, responses in results]
+             "responses": json.loads(responses)} for path, methods, description, request_body, responses in results]
 
 # Function to forward requests to the external API
-def forward_request(endpoint, method, headers=None, data=None, params=None):
+def forward_request(endpoint, methods, headers=None, data=None, params=None):
     url = f"https://api.trmm.org{endpoint}"
-    if method.lower() == "get":
+    if methods.lower() == "get":
         response = requests.get(url, headers=headers, params=params)
-    elif method.lower() == "post":
+    elif methods.lower() == "post":
         response = requests.post(url, headers=headers, json=data)
-    elif method.lower() == "put":
+    elif methods.lower() == "put":
         response = requests.put(url, headers=headers, json=data)
-    elif method.lower() == "delete":
+    elif methods.lower() == "delete":
         response = requests.delete(url, headers=headers)
     else:
         return jsonify({"error": "Unsupported HTTP method"}), 405
@@ -79,7 +79,7 @@ def query_api():
     # Extract endpoint and method from the results
     endpoint_info = results[0]  # You can customize this if there are multiple results
     endpoint = endpoint_info['path']
-    method = endpoint_info['method'].lower()
+    method = endpoint_info['methods'].lower()
 
     # Forward the request to the external API
     api_key = request.headers.get('X-API-KEY')
