@@ -14,6 +14,12 @@ def translate_list_agents() -> dict[str, Any]:
         "method": "GET",
     }
 
+def translate_find_agent(name: str) -> dict[str, Any]:
+    return {
+        "action": "find_agent",
+        "path": "/agents/",
+        "method": "GET",
+    }
 
 def translate_get_agent(agent_id: str) -> dict[str, Any]:
     return {
