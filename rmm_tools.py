@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 from api_client import ToolResult, api_request
 from translator import (
     translate_list_agents,
+    translate_find_agent,
     translate_get_agent,
     translate_list_agent_checks,
     translate_run_checks,
@@ -96,6 +97,32 @@ async def list_agents() -> dict:
     return {
         "ok": True,
         "agents": result.data,
+    }
+    
+@mcp.tool()
+async def find_agent(name: str) -> dict:
+    """Search for agents by name. Matches against hostname, description, and logged_username (case-insensitive)."""
+    result = await _execute(translate_find_agent(name))
+    if not result.ok:
+        return {
+            "ok": False,
+            "error": result.error,
+            "details": result.details,
+            "status_code": result.status_code,
+        }
+
+    query = name.lower()
+    filtered = [
+        agent for agent in result.data
+        if query in agent.get("hostname", "").lower()
+        or query in agent.get("description", "").lower()
+        or query in agent.get("logged_username", "").lower()
+    ]
+
+    return {
+        "ok": True,
+        "count": len(filtered),
+        "agents": filtered,
     }
 
 
